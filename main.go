@@ -53,6 +53,8 @@ func scrobbler() error {
 	ticker := time.NewTicker(interval)
 	var prevTrack = ""
 
+	//For loop that constantly checks for the current track on LastFM
+	// and updates the Discord status if it changes
 	for {
 		select {
 		case <-ticker.C:
@@ -67,11 +69,13 @@ func scrobbler() error {
 					if isNowPlaying && prevTrack != trackName {
 						prevTrack = trackName
 						statusData := discordgo.UpdateStatusData{
-							Game: &discordgo.Game{
-								Name:    prevTrack,
-								Type:    discordgo.GameTypeListening,
-								Details: "LAST.FM",
-								State:   "DiscordLastfmScrobbler",
+							Activities: []*discordgo.Activity{
+								{
+									Name:    prevTrack,
+									Type:    discordgo.ActivityTypeListening,
+									Details: "LAST.FM",
+									State:   "DiscordLastfmScrobbler",
+								},
 							},
 							AFK:    false,
 							Status: "online",
