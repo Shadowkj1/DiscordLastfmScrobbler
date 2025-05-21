@@ -3,8 +3,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"time"
+	"bufio"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/go-ini/ini"
@@ -16,12 +19,75 @@ func Print(text string) {
 	fmt.Println(currentTime, " - ", text)
 }
 
-func scrobbler() error {
+func createConfigFile() (string, error){
+		//create a new config file and prompt the user to set it up
+		reader := bufio.NewReader(os.Stdin)
+
+		fmt.Println("Config file not found. Would you like to create one step by step or manually?\nReply with 'step' or 'manual'")
+		response := ""
+
+		//get the response from the user
+		input, _ := reader.ReadString('\n')
+		response = strings.TrimSpace(input)
+
+		fmt.Scanln(&response)
+		fmt.Println("This is the response: ", response)
+		for response != "step" && response != "manual" {
+			fmt.Println("Please enter 'step' or 'manual'")
+			fmt.Scanln(&response)
+		}
+
+		if response == "step" {
+			fmt.Println("Please enter your LastFM API key:")
+			var apiKey string
+			fmt.Scanln(&apiKey)
+			fmt.Println("Please enter your LastFM username:")
+			var username string
+			fmt.Scanln(&username)
+			fmt.Println("Please enter your Discord token:")
+			var token string
+			fmt.Scanln(&token)
+			fmt.Println("Please enter the interval in seconds:")
+			var interval int
+			fmt.Scanln(&interval)
+		} else if response == "manual" {
+			fmt.Println("Please create a config.ini file in this same directory with the following format:")
+			fmt.Println("[lastfm]")
+			fmt.Println("api_key = <your_api_key>")
+			fmt.Println("username = <your_username>")
+			fmt.Println("interval = <interval_in_seconds>")
+			fmt.Println("[discord]")
+			fmt.Println("token = <your_discord_token>")
+			//quit the program
+			return "Closing program...", nil
+		}
+		response = ""
+		return response, nil
+}
+
+func checkDiscordToken () string {
+	token := ""
+
+
+
+	return token
+}
+ 
+
+func scrobbler(quit chan struct{}) error {
+	//check if the config file even exists
+	fmt.Println("We are here")
 	cfg, err := ini.Load("config.ini")
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
+	fmt.Println("We are here again")
+	fmt.Printf("This is what is gained from: %v\n, and also err %v\n", cfg, err)
+
+	if cfg == nil{
+		createConfigFile()
+		} else {
+			fmt.Println(err)
+			return err
+		}
+	
 
 	token := cfg.Section("discord").Key("token").String()
 	apiKey := cfg.Section("lastfm").Key("api_key").String()
@@ -57,6 +123,10 @@ func scrobbler() error {
 	// and updates the Discord status if it changes
 	for {
 		select {
+		case <-quit:
+			Print("Scrobbler stopping...")
+			dg.Close()
+			return nil
 		case <-ticker.C:
 			result, err := api.User.GetRecentTracks(lastfm.P{"limit": "1", "user": username})
 			if err != nil {
@@ -93,7 +163,21 @@ func scrobbler() error {
 }
 
 func main() {
-	_ = scrobbler()
-	fmt.Println("Press the Enter Key to terminate the console screen!")
-	_, _ = fmt.Scanln()
+    quit := make(chan struct{})
+    
+    // Run scrobbler unless there is an error
+    go func() {
+        if err := scrobbler(quit); err != nil {
+            fmt.Println("Error in scrobbler:", err)
+        }
+    }()
+    
+    // Wait for user input to exit
+    fmt.Println("Scrobbler is running. Press Enter to exit.")
+    fmt.Scanln()
+    
+    // Signal scrobbler to quit
+    close(quit)
+    time.Sleep(1 * time.Second)
+    fmt.Println("Program terminated.")
 }
